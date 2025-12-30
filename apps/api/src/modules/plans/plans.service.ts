@@ -1,4 +1,5 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreatePlanDto } from './dto/create-plan.dto';
 import { UpdatePlanDto } from './dto/update-plan.dto';
@@ -8,14 +9,14 @@ export class PlansService {
   constructor(private readonly prisma: PrismaService) {}
 
   async create(actorUserId: string | undefined, data: CreatePlanDto) {
-    this.ensureActor(actorUserId);
+    const ensuredActorId = this.ensureActor(actorUserId);
     const plan = await this.prisma.plan.create({
       data: {
         ...data,
       },
     });
 
-    await this.logAudit(actorUserId, 'plan.create', plan.id, {
+    await this.logAudit(ensuredActorId, 'plan.create', plan.id, {
       created: plan,
     });
 
@@ -38,7 +39,7 @@ export class PlansService {
   }
 
   async update(actorUserId: string | undefined, id: string, data: UpdatePlanDto) {
-    this.ensureActor(actorUserId);
+    const ensuredActorId = this.ensureActor(actorUserId);
     const existing = await this.prisma.plan.findUnique({ where: { id } });
     if (!existing) {
       throw new NotFoundException('Plan not found');
@@ -49,7 +50,7 @@ export class PlansService {
       data,
     });
 
-    await this.logAudit(actorUserId, 'plan.update', id, {
+    await this.logAudit(ensuredActorId, 'plan.update', id, {
       before: existing,
       after: updated,
     });
@@ -58,7 +59,7 @@ export class PlansService {
   }
 
   async remove(actorUserId: string | undefined, id: string) {
-    this.ensureActor(actorUserId);
+    const ensuredActorId = this.ensureActor(actorUserId);
     const existing = await this.prisma.plan.findUnique({ where: { id } });
     if (!existing) {
       throw new NotFoundException('Plan not found');
@@ -66,24 +67,25 @@ export class PlansService {
 
     await this.prisma.plan.delete({ where: { id } });
 
-    await this.logAudit(actorUserId, 'plan.delete', id, {
+    await this.logAudit(ensuredActorId, 'plan.delete', id, {
       deleted: existing,
     });
 
     return { deleted: true };
   }
 
-  private ensureActor(actorUserId: string | undefined) {
+  private ensureActor(actorUserId: string | undefined): string {
     if (!actorUserId) {
       throw new BadRequestException('Missing x-actor-user-id header');
     }
+    return actorUserId;
   }
 
   private async logAudit(
     actorUserId: string,
     action: string,
     targetId: string,
-    metadata: Record<string, unknown>,
+    metadata: Prisma.InputJsonValue,
   ) {
     await this.prisma.adminAuditLog.create({
       data: {

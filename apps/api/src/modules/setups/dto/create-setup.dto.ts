@@ -10,20 +10,20 @@ import {
 export class CreateSetupDto {
   @IsString()
   @IsNotEmpty()
-  name: string;
+  name!: string;
 
   @IsString()
   @IsNotEmpty()
-  symbol: string;
+  symbol!: string;
 
   @IsString()
   @IsNotEmpty()
-  timeframe: string;
+  timeframe!: string;
 
   @IsArray()
   @ArrayNotEmpty()
   @IsString({ each: true })
-  indicators: string[];
+  indicators!: string[];
 
   @IsBoolean()
   @IsOptional()

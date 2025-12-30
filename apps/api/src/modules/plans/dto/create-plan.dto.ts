@@ -16,28 +16,28 @@ import { Market } from '@prisma/client';
 export class CreatePlanDto {
   @IsString()
   @IsNotEmpty()
-  name: string;
+  name!: string;
 
   @IsString()
   @IsNotEmpty()
-  description: string;
+  description!: string;
 
   @IsNumber({ maxDecimalPlaces: 2 })
   @IsPositive()
-  price: number;
+  price!: number;
 
   @IsString()
   @Length(3, 3)
-  currency: string;
+  currency!: string;
 
   @IsInt()
   @IsPositive()
-  maxIndicatorsActive: number;
+  maxIndicatorsActive!: number;
 
   @IsArray()
   @ArrayNotEmpty()
   @IsEnum(Market, { each: true })
-  allowedMarkets: Market[];
+  allowedMarkets!: Market[];
 
   @IsBoolean()
   @IsOptional()
