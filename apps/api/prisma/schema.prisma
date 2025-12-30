@@ -1,0 +1,149 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  USER
+  ADMIN
+  SUPPORT
+}
+
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  CANCELED
+  EXPIRED
+}
+
+enum Market {
+  FOREX
+  INDICES
+  CRYPTO
+}
+
+model User {
+  id             String          @id @default(uuid())
+  name           String
+  email          String          @unique
+  passwordHash   String
+  role           UserRole        @default(USER)
+  status         UserStatus      @default(ACTIVE)
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  subscriptions  Subscription[]
+  setups         UserSetup[]
+  auditLogs      AdminAuditLog[] @relation("AdminActor")
+
+  @@index([role])
+  @@index([status])
+}
+
+model Plan {
+  id                  String          @id @default(uuid())
+  name                String
+  description         String
+  price               Decimal         @db.Decimal(10, 2)
+  currency            String
+  maxIndicatorsActive Int
+  allowedMarkets      Market[]
+  isActive            Boolean         @default(true)
+  createdAt           DateTime        @default(now())
+  updatedAt           DateTime        @updatedAt
+  subscriptions       Subscription[]
+  planIndicators      PlanIndicator[]
+
+  @@index([isActive])
+}
+
+model Subscription {
+  id        String             @id @default(uuid())
+  userId    String
+  planId    String
+  status    SubscriptionStatus @default(ACTIVE)
+  startedAt DateTime
+  endsAt    DateTime?
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
+  user      User               @relation(fields: [userId], references: [id])
+  plan      Plan               @relation(fields: [planId], references: [id])
+
+  @@index([userId])
+  @@index([planId])
+  @@index([status])
+  @@index([userId, status])
+}
+
+model Indicator {
+  id                 String           @id @default(uuid())
+  code               String           @unique
+  name               String
+  description        String
+  category           String
+  isPremium          Boolean          @default(false)
+  defaultParams      Json
+  userParamsEditable Boolean          @default(true)
+  isActive           Boolean          @default(true)
+  planIndicators     PlanIndicator[]
+
+  @@index([category])
+  @@index([isActive])
+  @@index([isPremium])
+}
+
+model PlanIndicator {
+  planId      String
+  indicatorId String
+  plan        Plan      @relation(fields: [planId], references: [id])
+  indicator   Indicator @relation(fields: [indicatorId], references: [id])
+
+  @@id([planId, indicatorId])
+  @@index([indicatorId])
+}
+
+model UserSetup {
+  id         String   @id @default(uuid())
+  userId     String
+  name       String
+  symbol     String
+  timeframe  String
+  indicators Json
+  isDefault  Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  user       User     @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([symbol])
+  @@index([timeframe])
+  @@index([isDefault])
+}
+
+model AdminAuditLog {
+  id          String   @id @default(uuid())
+  actorUserId String
+  action      String
+  targetType  String
+  targetId    String
+  metadata    Json
+  createdAt   DateTime @default(now())
+  actor       User     @relation("AdminActor", fields: [actorUserId], references: [id])
+
+  @@index([actorUserId])
+  @@index([targetType, targetId])
+  @@index([createdAt])
+}
+
+/// Seed inicial sugerido:
+/// - Criar planos Starter, Pro e Prime com seus limites de indicadores e mercados.
+/// - Criar indicadores clássicos (SMA, EMA, RSI, MACD) e proprietários básicos.
+/// - Popular PlanIndicator para mapear planos -> indicadores disponíveis.
+/// - Criar um usuário ADMIN e um SUPPORT para gestão inicial.
