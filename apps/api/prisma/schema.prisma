@@ -42,6 +42,9 @@ model User {
   subscriptions  Subscription[]
   setups         UserSetup[]
   auditLogs      AdminAuditLog[] @relation("AdminActor")
+
+  @@index([role])
+  @@index([status])
 }
 
 model Plan {
@@ -57,6 +60,8 @@ model Plan {
   updatedAt           DateTime        @updatedAt
   subscriptions       Subscription[]
   planIndicators      PlanIndicator[]
+
+  @@index([isActive])
 }
 
 model Subscription {
@@ -70,6 +75,11 @@ model Subscription {
   updatedAt DateTime           @updatedAt
   user      User               @relation(fields: [userId], references: [id])
   plan      Plan               @relation(fields: [planId], references: [id])
+
+  @@index([userId])
+  @@index([planId])
+  @@index([status])
+  @@index([userId, status])
 }
 
 model Indicator {
@@ -83,6 +93,10 @@ model Indicator {
   userParamsEditable Boolean          @default(true)
   isActive           Boolean          @default(true)
   planIndicators     PlanIndicator[]
+
+  @@index([category])
+  @@index([isActive])
+  @@index([isPremium])
 }
 
 model PlanIndicator {
@@ -92,6 +106,7 @@ model PlanIndicator {
   indicator   Indicator @relation(fields: [indicatorId], references: [id])
 
   @@id([planId, indicatorId])
+  @@index([indicatorId])
 }
 
 model UserSetup {
@@ -105,6 +120,11 @@ model UserSetup {
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
   user       User     @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([symbol])
+  @@index([timeframe])
+  @@index([isDefault])
 }
 
 model AdminAuditLog {
@@ -116,4 +136,14 @@ model AdminAuditLog {
   metadata    Json
   createdAt   DateTime @default(now())
   actor       User     @relation("AdminActor", fields: [actorUserId], references: [id])
+
+  @@index([actorUserId])
+  @@index([targetType, targetId])
+  @@index([createdAt])
 }
+
+/// Seed inicial sugerido:
+/// - Criar planos Starter, Pro e Prime com seus limites de indicadores e mercados.
+/// - Criar indicadores clássicos (SMA, EMA, RSI, MACD) e proprietários básicos.
+/// - Popular PlanIndicator para mapear planos -> indicadores disponíveis.
+/// - Criar um usuário ADMIN e um SUPPORT para gestão inicial.
