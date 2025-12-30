@@ -1,0 +1,12 @@
+{
+  "name": "projeto-saas",
+  "private": true,
+  "workspaces": [
+    "apps/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspace @projeto-saas/web",
+    "dev:api": "npm run start:dev --workspace @projeto-saas/api",
+    "dev:web": "npm run dev --workspace @projeto-saas/web"
+  }
+}
