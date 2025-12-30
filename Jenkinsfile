@@ -1,12 +1,18 @@
-stage('Install & Build') {
-  steps {
-    sh '''
-      node -v
-      npm -v
+pipeline {
+  agent any
 
-      npm ci
-      npm run -w apps/api build
-      npm run -w apps/web build
-    '''
+  stages {
+    stage('Install & Build') {
+      steps {
+        sh '''
+          node -v
+          npm -v
+
+          npm ci
+          npm run -w apps/api build
+          npm run -w apps/web build
+        '''
+      }
+    }
   }
 }
