@@ -8,12 +8,12 @@ export class SetupsService {
   constructor(private readonly prisma: PrismaService) {}
 
   async create(userId: string | undefined, data: CreateSetupDto) {
-    this.ensureUser(userId);
-    await this.validateIndicatorsAllowed(userId, data.indicators);
+    const ensuredUserId = this.ensureUser(userId);
+    await this.validateIndicatorsAllowed(ensuredUserId, data.indicators);
 
     return this.prisma.userSetup.create({
       data: {
-        userId,
+        userId: ensuredUserId,
         name: data.name,
         symbol: data.symbol,
         timeframe: data.timeframe,
@@ -24,17 +24,17 @@ export class SetupsService {
   }
 
   async findAll(userId: string | undefined) {
-    this.ensureUser(userId);
+    const ensuredUserId = this.ensureUser(userId);
     return this.prisma.userSetup.findMany({
-      where: { userId },
+      where: { userId: ensuredUserId },
       orderBy: { updatedAt: 'desc' },
     });
   }
 
   async findOne(userId: string | undefined, id: string) {
-    this.ensureUser(userId);
+    const ensuredUserId = this.ensureUser(userId);
     const setup = await this.prisma.userSetup.findFirst({
-      where: { id, userId },
+      where: { id, userId: ensuredUserId },
     });
     if (!setup) {
       throw new NotFoundException('Setup not found');
@@ -43,16 +43,16 @@ export class SetupsService {
   }
 
   async update(userId: string | undefined, id: string, data: UpdateSetupDto) {
-    this.ensureUser(userId);
+    const ensuredUserId = this.ensureUser(userId);
     const existing = await this.prisma.userSetup.findFirst({
-      where: { id, userId },
+      where: { id, userId: ensuredUserId },
     });
     if (!existing) {
       throw new NotFoundException('Setup not found');
     }
 
     if (data.indicators) {
-      await this.validateIndicatorsAllowed(userId, data.indicators);
+      await this.validateIndicatorsAllowed(ensuredUserId, data.indicators);
     }
 
     return this.prisma.userSetup.update({
@@ -68,9 +68,9 @@ export class SetupsService {
   }
 
   async remove(userId: string | undefined, id: string) {
-    this.ensureUser(userId);
+    const ensuredUserId = this.ensureUser(userId);
     const existing = await this.prisma.userSetup.findFirst({
-      where: { id, userId },
+      where: { id, userId: ensuredUserId },
     });
     if (!existing) {
       throw new NotFoundException('Setup not found');
@@ -80,10 +80,11 @@ export class SetupsService {
     return { deleted: true };
   }
 
-  private ensureUser(userId: string | undefined) {
+  private ensureUser(userId: string | undefined): string {
     if (!userId) {
       throw new BadRequestException('Missing x-user-id header');
     }
+    return userId;
   }
 
   private async validateIndicatorsAllowed(userId: string, indicators: string[]) {
@@ -111,7 +112,9 @@ export class SetupsService {
 
     const plan = subscription.plan;
     const allowedIndicatorCodes = new Set(
-      plan.planIndicators.map((item) => item.indicator.code),
+      plan.planIndicators.map(
+        (item: { indicator: { code: string } }) => item.indicator.code,
+      ),
     );
     const requested = Array.from(new Set(indicators));
 
