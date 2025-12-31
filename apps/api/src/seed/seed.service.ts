@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { Market, Prisma } from '@prisma/client';
+import { Market, Prisma, UserRole, UserStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import * as bcrypt from 'bcryptjs';
 
 @Injectable()
 export class SeedService {
@@ -13,6 +14,7 @@ export class SeedService {
     const indicatorCount = await this.prisma.indicator.count();
 
     if (planCount > 0 && indicatorCount > 0) {
+      await this.ensureDefaultAdmin();
       return;
     }
 
@@ -145,5 +147,49 @@ export class SeedService {
     }
 
     this.logger.log('Seed completed.');
+    await this.ensureDefaultAdmin();
+  }
+
+  private async ensureDefaultAdmin() {
+    const adminEmail = process.env.ADMIN_EMAIL?.toLowerCase();
+    const adminPassword = process.env.ADMIN_PASSWORD;
+    if (!adminEmail || !adminPassword) {
+      this.logger.warn('ADMIN_EMAIL/ADMIN_PASSWORD not set; skipping admin seed.');
+      return;
+    }
+
+    const existing = await this.prisma.user.findUnique({
+      where: { email: adminEmail },
+    });
+    if (existing) {
+      return;
+    }
+
+    const passwordHash = await bcrypt.hash(adminPassword, 10);
+    const admin = await this.prisma.user.create({
+      data: {
+        name: 'Admin',
+        email: adminEmail,
+        passwordHash,
+        role: UserRole.ADMIN,
+        status: UserStatus.ACTIVE,
+      },
+    });
+
+    const starterPlan = await this.prisma.plan.findFirst({
+      where: { name: 'Starter' },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    if (starterPlan) {
+      await this.prisma.subscription.create({
+        data: {
+          userId: admin.id,
+          planId: starterPlan.id,
+          status: 'ACTIVE',
+          startedAt: new Date(),
+        },
+      });
+    }
   }
 }

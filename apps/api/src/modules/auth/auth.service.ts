@@ -105,6 +105,9 @@ export class AuthService {
   }
 
   async refresh(dto: RefreshDto) {
+    if (!dto.refreshToken) {
+      throw new UnauthorizedException('Missing refresh token');
+    }
     const tokenHash = this.hashToken(dto.refreshToken);
     const existing = await this.prisma.refreshToken.findUnique({
       where: { tokenHash },
@@ -141,6 +144,9 @@ export class AuthService {
   }
 
   async logout(dto: LogoutDto) {
+    if (!dto.refreshToken) {
+      return { loggedOut: true };
+    }
     const tokenHash = this.hashToken(dto.refreshToken);
     await this.prisma.refreshToken.updateMany({
       where: { tokenHash, revokedAt: null },

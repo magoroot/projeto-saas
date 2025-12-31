@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { apiFetch, setCookie } from '../lib/api';
+import { apiFetch } from '../lib/api';
 
 type AuthResponse = {
   accessToken: string;
@@ -32,11 +32,6 @@ export default function LoginPage() {
         method: 'POST',
         body: JSON.stringify({ email, password }),
       });
-      setCookie('saas_access_token', response.accessToken, 1);
-      setCookie('saas_refresh_token', response.refreshToken, 30);
-      setCookie('saas_user_role', response.user.role, 7);
-      setCookie('saas_user_id', response.user.id, 7);
-      setCookie('saas_user_name', response.user.name, 7);
       router.push('/app');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Falha no login');
