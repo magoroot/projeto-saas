@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { apiFetch } from '../../lib/api';
+import { Toast } from '../../components/Toast';
 
 type Indicator = {
   id: string;
@@ -47,6 +48,8 @@ export default function AdminPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [audits, setAudits] = useState<AuditLog[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [pageLoading, setPageLoading] = useState(true);
+  const [toast, setToast] = useState<string | null>(null);
 
   const [indicatorForm, setIndicatorForm] = useState({
     code: '',
@@ -70,9 +73,11 @@ export default function AdminPage() {
   };
 
   useEffect(() => {
-    loadAll().catch((err) =>
-      setError(err instanceof Error ? err.message : 'Erro ao carregar admin'),
-    );
+    loadAll()
+      .catch((err) =>
+        setError(err instanceof Error ? err.message : 'Erro ao carregar admin'),
+      )
+      .finally(() => setPageLoading(false));
   }, []);
 
   const indicatorOptions = useMemo(
@@ -100,6 +105,7 @@ export default function AdminPage() {
       });
       setIndicatorForm({ code: '', name: '', description: '', category: '' });
       await loadAll();
+      setToast('Indicador criado com sucesso.');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erro ao criar indicador');
     }
@@ -113,6 +119,7 @@ export default function AdminPage() {
         body: JSON.stringify({ indicatorIds }),
       });
       await loadAll();
+      setToast('Plano atualizado com sucesso.');
     } catch (err) {
       setError(
         err instanceof Error ? err.message : 'Erro ao atualizar plano',
@@ -128,6 +135,7 @@ export default function AdminPage() {
         body: JSON.stringify({ status }),
       });
       await loadAll();
+      setToast('Status do usuário atualizado.');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erro ao atualizar usuário');
     }
@@ -141,10 +149,20 @@ export default function AdminPage() {
         body: JSON.stringify({ planId }),
       });
       await loadAll();
+      setToast('Plano do usuário atualizado.');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erro ao trocar plano');
     }
   };
+
+  if (pageLoading) {
+    return (
+      <main className="content">
+        <h1>Admin</h1>
+        <p>Carregando painel administrativo...</p>
+      </main>
+    );
+  }
 
   return (
     <main className="content">
@@ -332,6 +350,7 @@ export default function AdminPage() {
           ))}
         </div>
       </section>
+      {toast ? <Toast message={toast} onClose={() => setToast(null)} /> : null}
     </main>
   );
 }
