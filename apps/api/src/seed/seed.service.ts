@@ -14,6 +14,7 @@ export class SeedService {
     const indicatorCount = await this.prisma.indicator.count();
 
     if (planCount > 0 && indicatorCount > 0) {
+      this.logger.log('Seed already present. Skipping bootstrap.');
       await this.ensureDefaultAdmin();
       return;
     }
@@ -73,12 +74,15 @@ export class SeedService {
       },
     ];
 
-    for (const indicator of indicatorSeeds) {
-      await this.prisma.indicator.upsert({
-        where: { code: indicator.code },
-        update: indicator,
-        create: indicator,
-      });
+    if (indicatorCount === 0) {
+      this.logger.log('Creating indicator catalog...');
+      for (const indicator of indicatorSeeds) {
+        await this.prisma.indicator.upsert({
+          where: { code: indicator.code },
+          update: indicator,
+          create: indicator,
+        });
+      }
     }
 
     const planSeeds: Prisma.PlanCreateInput[] = [
@@ -111,43 +115,59 @@ export class SeedService {
       },
     ];
 
-    for (const plan of planSeeds) {
-      await this.prisma.plan.upsert({
-        where: { name: plan.name },
-        update: plan,
-        create: plan,
-      });
+    if (planCount === 0) {
+      this.logger.log('Creating plans...');
+      for (const plan of planSeeds) {
+        await this.prisma.plan.upsert({
+          where: { name: plan.name },
+          update: plan,
+          create: plan,
+        });
+      }
     }
 
-    const plans = await this.prisma.plan.findMany();
-    const indicators = await this.prisma.indicator.findMany();
-    const indicatorMap = new Map(indicators.map((item) => [item.code, item.id]));
+    const planIndicatorCount = await this.prisma.planIndicator.count();
+    if (planIndicatorCount === 0) {
+      this.logger.log('Mapping plan indicators...');
+      const plans = await this.prisma.plan.findMany();
+      const indicators = await this.prisma.indicator.findMany();
+      const indicatorMap = new Map(
+        indicators.map((item) => [item.code, item.id]),
+      );
 
-    const planIndicatorMap: Record<string, string[]> = {
-      Starter: ['MA', 'RSI'],
-      Pro: ['MA', 'RSI', 'MACD'],
-      Prime: ['MA', 'RSI', 'MACD', 'ATLAS', 'PULSE'],
-    };
+      const planIndicatorMap: Record<string, string[]> = {
+        Starter: ['MA', 'RSI'],
+        Pro: ['MA', 'RSI', 'MACD'],
+        Prime: ['MA', 'RSI', 'MACD', 'ATLAS', 'PULSE'],
+      };
 
-    for (const plan of plans) {
-      const allowed = planIndicatorMap[plan.name] ?? [];
-      await this.prisma.planIndicator.deleteMany({ where: { planId: plan.id } });
-      if (allowed.length > 0) {
-        await this.prisma.planIndicator.createMany({
-          data: allowed
-            .map((code) => indicatorMap.get(code))
-            .filter(Boolean)
-            .map((indicatorId) => ({
-              planId: plan.id,
-              indicatorId: indicatorId as string,
-            })),
-          skipDuplicates: true,
-        });
+      for (const plan of plans) {
+        const allowed = planIndicatorMap[plan.name] ?? [];
+        if (allowed.length > 0) {
+          await this.prisma.planIndicator.createMany({
+            data: allowed
+              .map((code) => indicatorMap.get(code))
+              .filter(Boolean)
+              .map((indicatorId) => ({
+                planId: plan.id,
+                indicatorId: indicatorId as string,
+              })),
+            skipDuplicates: true,
+          });
+        }
       }
     }
 
     this.logger.log('Seed completed.');
     await this.ensureDefaultAdmin();
+  }
+
+  async reseed() {
+    this.logger.warn('Reseeding requested. Clearing existing data...');
+    await this.prisma.planIndicator.deleteMany();
+    await this.prisma.plan.deleteMany();
+    await this.prisma.indicator.deleteMany();
+    await this.ensureSeed();
   }
 
   private async ensureDefaultAdmin() {
