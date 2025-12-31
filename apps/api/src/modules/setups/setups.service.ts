@@ -7,13 +7,12 @@ import { UpdateSetupDto } from './dto/update-setup.dto';
 export class SetupsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async create(userId: string | undefined, data: CreateSetupDto) {
-    const ensuredUserId = this.ensureUser(userId);
-    await this.validateIndicatorsAllowed(ensuredUserId, data.indicators);
+  async create(userId: string, data: CreateSetupDto) {
+    await this.validateIndicatorsAllowed(userId, data.indicators);
 
     return this.prisma.userSetup.create({
       data: {
-        userId: ensuredUserId,
+        userId,
         name: data.name,
         symbol: data.symbol,
         timeframe: data.timeframe,
@@ -23,18 +22,16 @@ export class SetupsService {
     });
   }
 
-  async findAll(userId: string | undefined) {
-    const ensuredUserId = this.ensureUser(userId);
+  async findAll(userId: string) {
     return this.prisma.userSetup.findMany({
-      where: { userId: ensuredUserId },
+      where: { userId },
       orderBy: { updatedAt: 'desc' },
     });
   }
 
-  async findOne(userId: string | undefined, id: string) {
-    const ensuredUserId = this.ensureUser(userId);
+  async findOne(userId: string, id: string) {
     const setup = await this.prisma.userSetup.findFirst({
-      where: { id, userId: ensuredUserId },
+      where: { id, userId },
     });
     if (!setup) {
       throw new NotFoundException('Setup not found');
@@ -42,17 +39,16 @@ export class SetupsService {
     return setup;
   }
 
-  async update(userId: string | undefined, id: string, data: UpdateSetupDto) {
-    const ensuredUserId = this.ensureUser(userId);
+  async update(userId: string, id: string, data: UpdateSetupDto) {
     const existing = await this.prisma.userSetup.findFirst({
-      where: { id, userId: ensuredUserId },
+      where: { id, userId },
     });
     if (!existing) {
       throw new NotFoundException('Setup not found');
     }
 
     if (data.indicators) {
-      await this.validateIndicatorsAllowed(ensuredUserId, data.indicators);
+      await this.validateIndicatorsAllowed(userId, data.indicators);
     }
 
     return this.prisma.userSetup.update({
@@ -67,10 +63,9 @@ export class SetupsService {
     });
   }
 
-  async remove(userId: string | undefined, id: string) {
-    const ensuredUserId = this.ensureUser(userId);
+  async remove(userId: string, id: string) {
     const existing = await this.prisma.userSetup.findFirst({
-      where: { id, userId: ensuredUserId },
+      where: { id, userId },
     });
     if (!existing) {
       throw new NotFoundException('Setup not found');
@@ -78,13 +73,6 @@ export class SetupsService {
 
     await this.prisma.userSetup.delete({ where: { id } });
     return { deleted: true };
-  }
-
-  private ensureUser(userId: string | undefined): string {
-    if (!userId) {
-      throw new BadRequestException('Missing x-user-id header');
-    }
-    return userId;
   }
 
   private async validateIndicatorsAllowed(userId: string, indicators: string[]) {
