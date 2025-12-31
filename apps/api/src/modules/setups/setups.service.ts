@@ -3,38 +3,49 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { CreateSetupDto } from './dto/create-setup.dto';
 import { UpdateSetupDto } from './dto/update-setup.dto';
 
+type SetupIndicatorInput = {
+  code: string;
+  enabled?: boolean;
+  params?: Record<string, unknown>;
+};
+
 @Injectable()
 export class SetupsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async create(userId: string | undefined, data: CreateSetupDto) {
-    const ensuredUserId = this.ensureUser(userId);
-    await this.validateIndicatorsAllowed(ensuredUserId, data.indicators);
+  async create(userId: string, data: CreateSetupDto) {
+    const indicators = this.normalizeIndicators(data.indicators);
+    await this.validateIndicatorsAllowed(userId, indicators);
+
+    if (data.isDefault) {
+      await this.prisma.userSetup.updateMany({
+        where: { userId },
+        data: { isDefault: false },
+      });
+    }
 
     return this.prisma.userSetup.create({
       data: {
-        userId: ensuredUserId,
+        userId,
         name: data.name,
         symbol: data.symbol,
         timeframe: data.timeframe,
-        indicators: data.indicators,
+        indicators,
         isDefault: data.isDefault ?? false,
       },
     });
   }
 
-  async findAll(userId: string | undefined) {
-    const ensuredUserId = this.ensureUser(userId);
+  async findAll(userId: string) {
     return this.prisma.userSetup.findMany({
-      where: { userId: ensuredUserId },
+      where: { userId },
       orderBy: { updatedAt: 'desc' },
     });
   }
 
-  async findOne(userId: string | undefined, id: string) {
-    const ensuredUserId = this.ensureUser(userId);
+  async findOne(userId: string, id: string) {
     const setup = await this.prisma.userSetup.findFirst({
-      where: { id, userId: ensuredUserId },
+      where: { id, userId },
     });
     if (!setup) {
       throw new NotFoundException('Setup not found');
@@ -42,17 +53,27 @@ export class SetupsService {
     return setup;
   }
 
-  async update(userId: string | undefined, id: string, data: UpdateSetupDto) {
-    const ensuredUserId = this.ensureUser(userId);
+  async update(userId: string, id: string, data: UpdateSetupDto) {
     const existing = await this.prisma.userSetup.findFirst({
-      where: { id, userId: ensuredUserId },
+      where: { id, userId },
     });
     if (!existing) {
       throw new NotFoundException('Setup not found');
     }
 
-    if (data.indicators) {
-      await this.validateIndicatorsAllowed(ensuredUserId, data.indicators);
+    const indicators = data.indicators
+      ? this.normalizeIndicators(data.indicators)
+      : undefined;
+
+    if (indicators) {
+      await this.validateIndicatorsAllowed(userId, indicators);
+    }
+
+    if (data.isDefault) {
+      await this.prisma.userSetup.updateMany({
+        where: { userId },
+        data: { isDefault: false },
+      });
     }
 
     return this.prisma.userSetup.update({
@@ -61,16 +82,15 @@ export class SetupsService {
         name: data.name,
         symbol: data.symbol,
         timeframe: data.timeframe,
-        indicators: data.indicators,
+        indicators,
         isDefault: data.isDefault,
       },
     });
   }
 
-  async remove(userId: string | undefined, id: string) {
-    const ensuredUserId = this.ensureUser(userId);
+  async remove(userId: string, id: string) {
     const existing = await this.prisma.userSetup.findFirst({
-      where: { id, userId: ensuredUserId },
+      where: { id, userId },
     });
     if (!existing) {
       throw new NotFoundException('Setup not found');
@@ -80,14 +100,10 @@ export class SetupsService {
     return { deleted: true };
   }
 
-  private ensureUser(userId: string | undefined): string {
-    if (!userId) {
-      throw new BadRequestException('Missing x-user-id header');
-    }
-    return userId;
-  }
-
-  private async validateIndicatorsAllowed(userId: string, indicators: string[]) {
+  private async validateIndicatorsAllowed(
+    userId: string,
+    indicators: SetupIndicatorInput[],
+  ) {
     const subscription = await this.prisma.subscription.findFirst({
       where: {
         userId,
@@ -116,7 +132,12 @@ export class SetupsService {
         (item: { indicator: { code: string } }) => item.indicator.code,
       ),
     );
-    const requested = Array.from(new Set(indicators));
+    const activeIndicators = indicators.filter(
+      (indicator) => indicator.enabled !== false,
+    );
+    const requested = Array.from(
+      new Set(activeIndicators.map((indicator) => indicator.code)),
+    );
 
     if (requested.length > plan.maxIndicatorsActive) {
       throw new BadRequestException(
@@ -131,5 +152,27 @@ export class SetupsService {
         `Indicators not allowed for plan ${plan.name}: ${notAllowed.join(', ')}`,
       );
     }
+  }
+
+  private normalizeIndicators(
+    indicators: Array<SetupIndicatorInput> | string[],
+  ): SetupIndicatorInput[] {
+    if (indicators.length === 0) {
+      return [];
+    }
+
+    if (typeof indicators[0] === 'string') {
+    return (indicators as string[]).map((code) => ({
+      code: code.toUpperCase(),
+      enabled: true,
+      params: {},
+    }));
+  }
+
+  return (indicators as SetupIndicatorInput[]).map((indicator) => ({
+      code: indicator.code.toUpperCase(),
+      enabled: indicator.enabled ?? true,
+      params: indicator.params ?? {},
+    }));
   }
 }
