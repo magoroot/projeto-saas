@@ -80,7 +80,18 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           </button>
         </div>
       </aside>
-      <div className="app-content">{children}</div>
+      <div className="app-content">
+        <header className="app-header">
+          <div>
+            <h2>Área do cliente</h2>
+            <p>{userName ? `Bem-vindo, ${userName}` : 'Carregando usuário...'}</p>
+          </div>
+          <div>
+            <span className="badge">{userRole ?? '---'}</span>
+          </div>
+        </header>
+        {children}
+      </div>
     </div>
   );
 }

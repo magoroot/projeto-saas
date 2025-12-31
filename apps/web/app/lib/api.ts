@@ -18,6 +18,11 @@ export async function apiFetch<T>(
     credentials: 'include',
   });
 
+  if (response.status === 401 && typeof window !== 'undefined') {
+    window.location.href = '/login';
+    throw new Error('Sessão expirada');
+  }
+
   if (!response.ok) {
     let errorMessage = 'Erro ao comunicar com a API';
     try {

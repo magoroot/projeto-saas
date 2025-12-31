@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { apiFetch } from '../../lib/api';
+import { Toast } from '../../components/Toast';
 
 type Setup = {
   id: string;
@@ -34,6 +35,8 @@ export default function SetupsPage() {
   const [formState, setFormState] = useState<SetupFormState>(defaultFormState);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [pageLoading, setPageLoading] = useState(true);
+  const [toast, setToast] = useState<string | null>(null);
 
   const loadSetups = async () => {
     const response = await apiFetch<Setup[]>('/setups');
@@ -41,9 +44,11 @@ export default function SetupsPage() {
   };
 
   useEffect(() => {
-    loadSetups().catch((err) =>
-      setError(err instanceof Error ? err.message : 'Erro ao carregar setups'),
-    );
+    loadSetups()
+      .catch((err) =>
+        setError(err instanceof Error ? err.message : 'Erro ao carregar setups'),
+      )
+      .finally(() => setPageLoading(false));
   }, []);
 
   const handleSubmit = async (event: React.FormEvent) => {
@@ -68,11 +73,13 @@ export default function SetupsPage() {
           method: 'PATCH',
           body: JSON.stringify(payload),
         });
+        setToast('Setup atualizado com sucesso.');
       } else {
         await apiFetch('/setups', {
           method: 'POST',
           body: JSON.stringify(payload),
         });
+        setToast('Setup criado com sucesso.');
       }
       setFormState(defaultFormState);
       await loadSetups();
@@ -99,10 +106,20 @@ export default function SetupsPage() {
     try {
       await apiFetch(`/setups/${setupId}`, { method: 'DELETE' });
       await loadSetups();
+      setToast('Setup removido.');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erro ao remover setup');
     }
   };
+
+  if (pageLoading) {
+    return (
+      <main className="content">
+        <h1>Meus Setups</h1>
+        <p>Carregando setups...</p>
+      </main>
+    );
+  }
 
   return (
     <main className="content">
@@ -210,6 +227,9 @@ export default function SetupsPage() {
 
       <section className="card">
         <h3>Setups cadastrados</h3>
+        {setups.length === 0 ? (
+          <div className="empty-state">Nenhum setup cadastrado ainda.</div>
+        ) : null}
         <div className="table">
           <div className="table-row table-header">
             <span>Nome</span>
@@ -244,6 +264,7 @@ export default function SetupsPage() {
           ))}
         </div>
       </section>
+      {toast ? <Toast message={toast} onClose={() => setToast(null)} /> : null}
     </main>
   );
 }

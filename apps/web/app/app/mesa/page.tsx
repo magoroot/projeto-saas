@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { apiFetch } from '../../lib/api';
+import { Toast } from '../../components/Toast';
 
 type Setup = {
   id: string;
@@ -48,6 +49,8 @@ export default function WorkspacePage() {
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [planLimit, setPlanLimit] = useState<number>(0);
+  const [pageLoading, setPageLoading] = useState(true);
+  const [toast, setToast] = useState<string | null>(null);
 
   useEffect(() => {
     const load = async () => {
@@ -59,9 +62,11 @@ export default function WorkspacePage() {
       setAvailableIndicators(me.subscription?.indicators ?? []);
       setPlanLimit(me.subscription?.plan.maxIndicatorsActive ?? 0);
     };
-    load().catch((err) =>
-      setError(err instanceof Error ? err.message : 'Erro ao carregar mesa'),
-    );
+    load()
+      .catch((err) =>
+        setError(err instanceof Error ? err.message : 'Erro ao carregar mesa'),
+      )
+      .finally(() => setPageLoading(false));
   }, []);
 
   useEffect(() => {
@@ -153,11 +158,13 @@ export default function WorkspacePage() {
           method: 'PATCH',
           body: JSON.stringify(payload),
         });
+        setToast('Setup atualizado na mesa.');
       } else {
         await apiFetch('/setups', {
           method: 'POST',
           body: JSON.stringify(payload),
         });
+        setToast('Setup criado na mesa.');
       }
       const setupsResponse = await apiFetch<Setup[]>('/setups');
       setSetups(setupsResponse);
@@ -167,6 +174,15 @@ export default function WorkspacePage() {
       setSaving(false);
     }
   };
+
+  if (pageLoading) {
+    return (
+      <main className="content">
+        <h1>Mesa</h1>
+        <p>Carregando mesa...</p>
+      </main>
+    );
+  }
 
   return (
     <main className="content">
@@ -290,6 +306,7 @@ export default function WorkspacePage() {
           Esta mesa é apenas para análise técnica. Nenhuma ordem é executada.
         </div>
       </section>
+      {toast ? <Toast message={toast} onClose={() => setToast(null)} /> : null}
     </main>
   );
 }
