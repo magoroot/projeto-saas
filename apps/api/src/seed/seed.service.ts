@@ -97,11 +97,12 @@ export class SeedService {
     if (planCount === 0) {
       this.logger.log('Creating plans...');
       for (const plan of planSeeds) {
-        await this.prisma.plan.upsert({
+        const existing = await this.prisma.plan.findFirst({
           where: { name: plan.name },
-          update: plan,
-          create: plan,
         });
+        if (!existing) {
+          await this.prisma.plan.create({ data: plan });
+        }
       }
     }
 

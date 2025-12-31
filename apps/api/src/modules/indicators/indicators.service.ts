@@ -1,4 +1,6 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
+import { InputJsonValue } from '@prisma/client/runtime/library';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateIndicatorDto } from './dto/create-indicator.dto';
 import { UpdateIndicatorDto } from './dto/update-indicator.dto';
@@ -16,7 +18,7 @@ export class IndicatorsService {
         description: data.description,
         category: data.category,
         isPremium: data.isPremium ?? false,
-        defaultParams: data.defaultParams ?? {},
+        defaultParams: (data.defaultParams ?? {}) as InputJsonValue,
         userParamsEditable: data.userParamsEditable ?? true,
         isActive: data.isActive ?? true,
       },
@@ -52,7 +54,7 @@ export class IndicatorsService {
       data: {
         ...data,
         code: data.code ? data.code.toUpperCase() : undefined,
-        defaultParams: (data.defaultParams as any) ?? undefined,
+        defaultParams: (data.defaultParams as InputJsonValue) ?? undefined,
       },
     });
 

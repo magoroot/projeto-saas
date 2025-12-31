@@ -1,4 +1,6 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
+import { InputJsonValue } from '@prisma/client/runtime/library';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateSetupDto } from './dto/create-setup.dto';
 import { UpdateSetupDto } from './dto/update-setup.dto';
@@ -30,7 +32,7 @@ export class SetupsService {
         name: data.name,
         symbol: data.symbol,
         timeframe: data.timeframe,
-        indicators,
+        indicators: (indicators ?? []) as unknown as InputJsonValue,
         isDefault: data.isDefault ?? false,
       },
     });
@@ -82,7 +84,9 @@ export class SetupsService {
         name: data.name,
         symbol: data.symbol,
         timeframe: data.timeframe,
-        indicators,
+        indicators: indicators
+          ? ((indicators ?? []) as unknown as InputJsonValue)
+          : undefined,
         isDefault: data.isDefault,
       },
     });
