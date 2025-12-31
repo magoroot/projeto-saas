@@ -41,10 +41,24 @@ model User {
   updatedAt      DateTime        @updatedAt
   subscriptions  Subscription[]
   setups         UserSetup[]
+  refreshTokens  RefreshToken[]
   auditLogs      AdminAuditLog[] @relation("AdminActor")
 
   @@index([role])
   @@index([status])
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  userId    String
+  tokenHash String   @unique
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([expiresAt])
 }
 
 model Plan {
