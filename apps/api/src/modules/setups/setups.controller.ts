@@ -3,54 +3,49 @@ import {
   Controller,
   Delete,
   Get,
-  Headers,
   Param,
   Patch,
   Post,
+  Req,
+  UseGuards,
 } from '@nestjs/common';
 import { SetupsService } from './setups.service';
 import { CreateSetupDto } from './dto/create-setup.dto';
 import { UpdateSetupDto } from './dto/update-setup.dto';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { AuthenticatedRequest } from '../auth/auth.types';
 
 @Controller('setups')
+@UseGuards(JwtAuthGuard)
 export class SetupsController {
   constructor(private readonly setupsService: SetupsService) {}
 
   @Post()
-  create(
-    @Headers('x-user-id') userId: string | undefined,
-    @Body() createSetupDto: CreateSetupDto,
-  ) {
-    return this.setupsService.create(userId, createSetupDto);
+  create(@Req() req: AuthenticatedRequest, @Body() createSetupDto: CreateSetupDto) {
+    return this.setupsService.create(req.user.id, createSetupDto);
   }
 
   @Get()
-  findAll(@Headers('x-user-id') userId: string | undefined) {
-    return this.setupsService.findAll(userId);
+  findAll(@Req() req: AuthenticatedRequest) {
+    return this.setupsService.findAll(req.user.id);
   }
 
   @Get(':id')
-  findOne(
-    @Headers('x-user-id') userId: string | undefined,
-    @Param('id') id: string,
-  ) {
-    return this.setupsService.findOne(userId, id);
+  findOne(@Req() req: AuthenticatedRequest, @Param('id') id: string) {
+    return this.setupsService.findOne(req.user.id, id);
   }
 
   @Patch(':id')
   update(
-    @Headers('x-user-id') userId: string | undefined,
+    @Req() req: AuthenticatedRequest,
     @Param('id') id: string,
     @Body() updateSetupDto: UpdateSetupDto,
   ) {
-    return this.setupsService.update(userId, id, updateSetupDto);
+    return this.setupsService.update(req.user.id, id, updateSetupDto);
   }
 
   @Delete(':id')
-  remove(
-    @Headers('x-user-id') userId: string | undefined,
-    @Param('id') id: string,
-  ) {
-    return this.setupsService.remove(userId, id);
+  remove(@Req() req: AuthenticatedRequest, @Param('id') id: string) {
+    return this.setupsService.remove(req.user.id, id);
   }
 }

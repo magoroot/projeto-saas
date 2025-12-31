@@ -5,7 +5,22 @@ import {
   IsNotEmpty,
   IsOptional,
   IsString,
+  ValidateNested,
 } from 'class-validator';
+import { Type } from 'class-transformer';
+
+class SetupIndicatorDto {
+  @IsString()
+  @IsNotEmpty()
+  code!: string;
+
+  @IsBoolean()
+  @IsOptional()
+  enabled?: boolean;
+
+  @IsOptional()
+  params?: Record<string, unknown>;
+}
 
 export class CreateSetupDto {
   @IsString()
@@ -22,8 +37,9 @@ export class CreateSetupDto {
 
   @IsArray()
   @ArrayNotEmpty()
-  @IsString({ each: true })
-  indicators!: string[];
+  @ValidateNested({ each: true })
+  @Type(() => SetupIndicatorDto)
+  indicators!: SetupIndicatorDto[];
 
   @IsBoolean()
   @IsOptional()

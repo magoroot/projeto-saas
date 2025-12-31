@@ -23,10 +23,17 @@ export class PlansService {
     return plan;
   }
 
-  async findAll(isActive?: boolean) {
+  async findAll(isActive?: boolean, includeIndicators = false) {
     return this.prisma.plan.findMany({
       where: isActive === undefined ? undefined : { isActive },
       orderBy: { createdAt: 'desc' },
+      include: includeIndicators
+        ? {
+            planIndicators: {
+              include: { indicator: true },
+            },
+          }
+        : undefined,
     });
   }
 
@@ -72,6 +79,39 @@ export class PlansService {
     });
 
     return { deleted: true };
+  }
+
+  async updateIndicators(
+    actorUserId: string | undefined,
+    planId: string,
+    indicatorIds: string[],
+  ) {
+    const ensuredActorId = this.ensureActor(actorUserId);
+    const plan = await this.prisma.plan.findUnique({ where: { id: planId } });
+    if (!plan) {
+      throw new NotFoundException('Plan not found');
+    }
+
+    await this.prisma.planIndicator.deleteMany({ where: { planId } });
+    if (indicatorIds.length > 0) {
+      await this.prisma.planIndicator.createMany({
+        data: indicatorIds.map((indicatorId) => ({ planId, indicatorId })),
+        skipDuplicates: true,
+      });
+    }
+
+    await this.logAudit(ensuredActorId, 'plan.indicators.update', planId, {
+      indicatorIds,
+    });
+
+    return this.prisma.plan.findUnique({
+      where: { id: planId },
+      include: {
+        planIndicators: {
+          include: { indicator: true },
+        },
+      },
+    });
   }
 
   private ensureActor(actorUserId: string | undefined): string {
