@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: saas-web
+  namespace: saas-operator
+spec:
+  selector:
+    app: saas-web
+  ports:
+    - name: http
+      port: 3000
+      targetPort: 3000
