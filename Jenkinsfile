@@ -45,19 +45,31 @@ pipeline {
 
     stage('Docker Push') {
       steps {
+        withCredentials([usernamePassword(
+          credentialsId: 'dockerhub-credentials',
+          usernameVariable: 'DU',
+          passwordVariable: 'DP'
+        )]) {
           sh '''#!/bin/bash
+            set -e
+            TAG=${BUILD_NUMBER}
 
+            echo "Logging into Docker Hub as ${DU}"
+            echo "${DP}" | docker login -u "${DU}" --password-stdin
+
+            echo "Pushing API images..."
             docker push ${API_IMAGE_REPO}:${TAG}
             docker push ${API_IMAGE_REPO}:latest
 
+            echo "Pushing WEB images..."
             docker push ${WEB_IMAGE_REPO}:${TAG}
             docker push ${WEB_IMAGE_REPO}:latest
 
-            
+            docker logout || true
           '''
         }
       }
-
+    }
 
     stage('Deploy to Kubernetes') {
       steps {
@@ -72,24 +84,19 @@ pipeline {
 
             echo "Deploying tag: ${TAG}"
 
-            # Garantir namespace
             kubectl get ns ${K8S_NAMESPACE} >/dev/null 2>&1 || \
               kubectl create ns ${K8S_NAMESPACE}
 
-            # Copiar manifests (não sujar repo)
             cp k8s/10-api.yaml /tmp/10-api.yaml
             cp k8s/20-web.yaml /tmp/20-web.yaml
 
-            # Substituir imagens
             sed -i "s|REPLACE_API_IMAGE|${API_IMAGE_REPO}:${TAG}|g" /tmp/10-api.yaml
             sed -i "s|REPLACE_WEB_IMAGE|${WEB_IMAGE_REPO}:${TAG}|g" /tmp/20-web.yaml
 
-            # Aplicar base
             kubectl apply -f k8s/00-namespace.yaml
             kubectl apply -f k8s/01-secrets.yaml
             kubectl apply -f k8s/02-configmap.yaml
 
-            # Aplicar app
             kubectl -n ${K8S_NAMESPACE} apply -f /tmp/10-api.yaml
             kubectl -n ${K8S_NAMESPACE} apply -f k8s/11-api-service.yaml
 
@@ -113,7 +120,7 @@ pipeline {
       echo "✅ Pipeline concluída com sucesso!"
     }
     failure {
-      echo "❌ Pipeline falhou — agora o erro é REAL, não Groovy."
+      echo "❌ Pipeline falhou — cola o log do stage que falhou."
     }
   }
 }
