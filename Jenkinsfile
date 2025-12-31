@@ -45,7 +45,6 @@ pipeline {
 
     stage('Docker Push') {
       steps {
-        )]) {
           sh '''#!/bin/bash
 
             docker push ${API_IMAGE_REPO}:${TAG}
@@ -58,7 +57,7 @@ pipeline {
           '''
         }
       }
-    }
+
 
     stage('Deploy to Kubernetes') {
       steps {
