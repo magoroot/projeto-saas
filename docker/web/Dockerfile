@@ -1,31 +1,27 @@
 # docker/web/Dockerfile
 # Build context: raiz do repo (.)
+# Web: Next.js
+
+FROM node:20-bookworm-slim AS deps
+WORKDIR /app
+
+COPY package.json ./
+COPY apps/web/package.json apps/web/package.json
+COPY apps/api/package.json apps/api/package.json
+
+RUN npm install
 
 FROM node:20-bookworm-slim AS build
 WORKDIR /app
 
-# Certificados (útil para installs)
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    ca-certificates \
- && rm -rf /var/lib/apt/lists/*
+COPY --from=deps /app/node_modules /app/node_modules
+COPY . .
 
-# Copia manifests do workspace
-COPY package.json ./
-COPY apps/web/package.json apps/web/package.json
+# Base URL padrão para produção (mesmo host via Ingress)
+ARG NEXT_PUBLIC_API_BASE_URL=/api
+ENV NEXT_PUBLIC_API_BASE_URL=$NEXT_PUBLIC_API_BASE_URL
 
-RUN npm install
-
-# Copia código do WEB
-COPY apps/web apps/web
-
-# Build do Next
-WORKDIR /app/apps/web
-RUN npm run build
-
-# Remove dev deps
-WORKDIR /app
-RUN npm prune --omit=dev
-
+RUN npm run -w apps/web build
 
 FROM node:20-bookworm-slim AS runtime
 WORKDIR /app
@@ -34,8 +30,11 @@ ENV NODE_ENV=production
 ENV PORT=3000
 
 COPY --from=build /app/node_modules /app/node_modules
-COPY --from=build /app/apps/web /app/apps/web
+COPY --from=build /app/apps/web/package.json /app/apps/web/package.json
+COPY --from=build /app/apps/web/next.config.* /app/apps/web/ 2>/dev/null || true
+COPY --from=build /app/apps/web/public /app/apps/web/public
+COPY --from=build /app/apps/web/.next /app/apps/web/.next
 
 EXPOSE 3000
 
-CMD ["sh", "-c", "cd /app/apps/web && npm run start"]
+CMD ["npm", "run", "-w", "apps/web", "start", "--", "-p", "3000"]

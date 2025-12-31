@@ -2,29 +2,27 @@ pipeline {
   agent any
 
   environment {
-    // Infra (VM Docker remota)
-    DOCKER_HOST_VM = "172.16.30.56"
+    // ---- Docker VM (onde build/push acontecem)
+    DOCKER_HOST_VM   = "172.16.30.56"
     DOCKER_HOST_USER = "ubuntu"
+    REMOTE_DIR       = "/home/ubuntu/projeto-saas"
 
-    // Repo alvo na VM (caminho)
-    REMOTE_DIR = "~/projeto-saas"
+    // ---- Docker Hub
+    DOCKERHUB_USER = "magoroot"
+    APP_NAME       = "projeto-saas"
+    API_IMAGE_REPO = "${DOCKERHUB_USER}/${APP_NAME}-api"
+    WEB_IMAGE_REPO = "${DOCKERHUB_USER}/${APP_NAME}-web"
 
-    // Docker Hub
-    DOCKERHUB_USER = "magoroot"                 // <-- ajuste se necessário
-    API_IMAGE_REPO = "${DOCKERHUB_USER}/projeto-saas-api"
-    WEB_IMAGE_REPO = "${DOCKERHUB_USER}/projeto-saas-web"
-
-    // Kubernetes
+    // ---- Kubernetes
     K8S_NAMESPACE = "saas-operator"
 
-    // NodePorts (só referência)
-    WEB_NODEPORT = "30080"
-    API_NODEPORT = "30081"
+    // ---- Git repo
+    GIT_URL = "https://github.com/magoroot/projeto-saas.git"
+    GIT_BRANCH = "main"
   }
 
   options {
     timestamps()
-    disableConcurrentBuilds()
   }
 
   stages {
@@ -35,138 +33,115 @@ pipeline {
       }
     }
 
-    stage('Preflight - Docker Host') {
+    stage('Preflight (Docker VM)') {
       steps {
-        sshagent(['ssh-homelab-docker']) {
+        sshagent(credentials: ['docker-vm-ssh']) {
           sh """
             set -e
-            ssh -o StrictHostKeyChecking=no ${DOCKER_HOST_USER}@${DOCKER_HOST_VM} "
+            ssh -o StrictHostKeyChecking=no ${DOCKER_HOST_USER}@${DOCKER_HOST_VM} '
               set -e
-              echo 'REMOTE HOST:' \$(hostname)
+              docker version >/dev/null
               docker ps >/dev/null
-              echo 'OK: docker acessível'
-            "
+              echo "[OK] Docker VM pronta"
+            '
           """
         }
       }
     }
 
-    stage('Remote: Docker Build & Push (API + WEB)') {
+    stage('Build & Push Images (on Docker VM)') {
       steps {
-        sshagent(credentials: ['ssh-homelab-docker']) {
-          withCredentials([
-            usernamePassword(
-              credentialsId: 'dockerhub-credentials',
-              usernameVariable: 'DU',
-              passwordVariable: 'DP'
-            )
-          ]) {
-
+        withCredentials([usernamePassword(credentialsId: 'dockerhub-creds', usernameVariable: 'DH_USER', passwordVariable: 'DH_PASS')]) {
+          sshagent(credentials: ['docker-vm-ssh']) {
             sh """
               set -e
-              echo "🐳 Build/Push Docker na VM remota (API + WEB)"
 
-              ssh -tt -o StrictHostKeyChecking=no ${DOCKER_HOST_USER}@${DOCKER_HOST_VM} '
+              TAG=${BUILD_NUMBER}
+              echo "TAG=${BUILD_NUMBER}" > .tag
+
+              ssh -o StrictHostKeyChecking=no ${DOCKER_HOST_USER}@${DOCKER_HOST_VM} '
                 set -e
-                echo "VM Docker: \$(hostname)"
-
-                # Repo na VM
                 mkdir -p ${REMOTE_DIR}
-                if [ ! -d "${REMOTE_DIR}/.git" ]; then
-                  echo "Clonando repo..."
-                  rm -rf ${REMOTE_DIR}
-                  git clone ${env.GIT_URL ?: "https://github.com/magoroot/projeto-saas.git"} ${REMOTE_DIR}
+                cd ${REMOTE_DIR}
+
+                if [ ! -d repo ]; then
+                  git clone ${GIT_URL} repo
                 fi
 
-                cd ${REMOTE_DIR}
+                cd repo
                 git fetch --all
-                git reset --hard origin/${env.BRANCH_NAME ?: "main"} || git reset --hard origin/master
+                git checkout ${GIT_BRANCH}
+                git reset --hard origin/${GIT_BRANCH}
 
-                # valida dockerfiles
-                test -f docker/api/Dockerfile || { echo "ERRO: docker/api/Dockerfile não encontrado"; exit 1; }
-                test -f docker/web/Dockerfile || { echo "ERRO: docker/web/Dockerfile não encontrado"; exit 1; }
+                echo "[INFO] Buildando imagens..."
+                docker build -t ${API_IMAGE_REPO}:${BUILD_NUMBER} -t ${API_IMAGE_REPO}:latest -f docker/api/Dockerfile .
+                docker build -t ${WEB_IMAGE_REPO}:${BUILD_NUMBER} -t ${WEB_IMAGE_REPO}:latest -f docker/web/Dockerfile .
 
-                # 🔑 credenciais DockerHub
-                export DU="${DU}"
-                export DP="${DP}"
+                echo "[INFO] Login DockerHub..."
+                echo "${DH_PASS}" | docker login -u "${DH_USER}" --password-stdin
 
-                TAG="${BUILD_NUMBER}"
+                echo "[INFO] Push API..."
+                docker push ${API_IMAGE_REPO}:${BUILD_NUMBER}
+                docker push ${API_IMAGE_REPO}:latest
 
-                API_IMAGE="${API_IMAGE_REPO}:\${TAG}"
-                WEB_IMAGE="${WEB_IMAGE_REPO}:\${TAG}"
+                echo "[INFO] Push WEB..."
+                docker push ${WEB_IMAGE_REPO}:${BUILD_NUMBER}
+                docker push ${WEB_IMAGE_REPO}:latest
 
-                echo "🔐 Docker login"
-                docker logout >/dev/null 2>&1 || true
-                rm -f ~/.docker/config.json || true
-                echo "\$DP" | docker login -u "\$DU" --password-stdin
-
-                echo "🐳 Build API: \$API_IMAGE"
-                docker build -f docker/api/Dockerfile -t "\$API_IMAGE" -t "${API_IMAGE_REPO}:latest" .
-
-                echo "🐳 Build WEB: \$WEB_IMAGE"
-                docker build -f docker/web/Dockerfile -t "\$WEB_IMAGE" -t "${WEB_IMAGE_REPO}:latest" .
-
-                echo "🚀 Push API"
-                docker push "\$API_IMAGE"
-                docker push "${API_IMAGE_REPO}:latest"
-
-                echo "🚀 Push WEB"
-                docker push "\$WEB_IMAGE"
-                docker push "${WEB_IMAGE_REPO}:latest"
-
-                # salva as imagens geradas
-                echo "\$API_IMAGE" > /tmp/saas_last_api_image.txt
-                echo "\$WEB_IMAGE" > /tmp/saas_last_web_image.txt
-
-                docker logout >/dev/null 2>&1 || true
-                echo "✅ Build e push concluídos"
+                docker logout
+                echo "[OK] Build & Push concluído"
               '
+
+              echo "BUILT_API_IMAGE=${API_IMAGE_REPO}:${TAG}" > .images
+              echo "BUILT_WEB_IMAGE=${WEB_IMAGE_REPO}:${TAG}" >> .images
             """
-
-            script {
-              env.BUILT_API_IMAGE = sh(
-                script: "ssh -o StrictHostKeyChecking=no ${DOCKER_HOST_USER}@${DOCKER_HOST_VM} 'cat /tmp/saas_last_api_image.txt'",
-                returnStdout: true
-              ).trim()
-
-              env.BUILT_WEB_IMAGE = sh(
-                script: "ssh -o StrictHostKeyChecking=no ${DOCKER_HOST_USER}@${DOCKER_HOST_VM} 'cat /tmp/saas_last_web_image.txt'",
-                returnStdout: true
-              ).trim()
-
-              if (!env.BUILT_API_IMAGE || !env.BUILT_WEB_IMAGE) {
-                error("Imagem(s) vazia(s). Build remoto falhou silenciosamente.")
-              }
-
-              echo "✅ API Image: ${env.BUILT_API_IMAGE}"
-              echo "✅ WEB Image: ${env.BUILT_WEB_IMAGE}"
-            }
           }
         }
       }
     }
 
-    stage('Deploy to Kubernetes (NodePort)') {
+    stage('Deploy to Kubernetes (apply manifests)') {
       steps {
         withCredentials([file(credentialsId: 'kubeconfig-homelab', variable: 'KUBECONFIG')]) {
           sh """
             set -e
+            . ./.images
 
-            kubectl get nodes
+            echo "[INFO] Usando imagens:"
+            echo "API: \$BUILT_API_IMAGE"
+            echo "WEB: \$BUILT_WEB_IMAGE"
+
+            kubectl get nodes >/dev/null
+
+            # Namespace (idempotente)
             kubectl get ns ${K8S_NAMESPACE} >/dev/null 2>&1 || kubectl create ns ${K8S_NAMESPACE}
 
-            # Substitui imagens nos manifests (placeholders)
-            sed -i "s|REPLACE_API_IMAGE|${BUILT_API_IMAGE}|g" k8s/10-api.yaml
-            sed -i "s|REPLACE_WEB_IMAGE|${BUILT_WEB_IMAGE}|g" k8s/20-web.yaml
-
+            # Aplica config/base
             kubectl apply -f k8s/00-namespace.yaml
-            kubectl -n ${K8S_NAMESPACE} apply -f k8s/10-api.yaml
-            kubectl -n ${K8S_NAMESPACE} apply -f k8s/20-web.yaml
+            kubectl apply -f k8s/01-secrets.yaml
+            kubectl apply -f k8s/02-configmap.yaml
 
+            # Copia YAMLs pra /tmp pra não "sujar" workspace
+            cp k8s/10-api.yaml /tmp/10-api.yaml
+            cp k8s/20-web.yaml /tmp/20-web.yaml
+
+            # Substitui placeholders (alinhado com seus YAMLs)
+            sed -i "s|REPLACE_API_IMAGE|\\\$BUILT_API_IMAGE|g" /tmp/10-api.yaml
+            sed -i "s|REPLACE_WEB_IMAGE|\\\$BUILT_WEB_IMAGE|g" /tmp/20-web.yaml
+
+            # Aplica recursos
+            kubectl -n ${K8S_NAMESPACE} apply -f /tmp/10-api.yaml
+            kubectl -n ${K8S_NAMESPACE} apply -f k8s/11-api-service.yaml
+            kubectl -n ${K8S_NAMESPACE} apply -f /tmp/20-web.yaml
+            kubectl -n ${K8S_NAMESPACE} apply -f k8s/21-web-service.yaml
+            kubectl -n ${K8S_NAMESPACE} apply -f k8s/30-ingress.yaml
+
+            # Rollout
             kubectl -n ${K8S_NAMESPACE} rollout status deploy/saas-api
             kubectl -n ${K8S_NAMESPACE} rollout status deploy/saas-web
 
-            kubectl -n ${K8S_NAMESPACE} get deploy,po,svc -o wide
+            # Visão final
+            kubectl -n ${K8S_NAMESPACE} get deploy,po,svc,ingress -o wide
           """
         }
       }
@@ -174,11 +149,8 @@ pipeline {
   }
 
   post {
-    success {
-      echo "✅ Pipeline concluída! WEB NodePort=${WEB_NODEPORT} | API NodePort=${API_NODEPORT}"
-    }
-    failure {
-      echo "❌ Pipeline falhou — cola o log do stage que falhou e a gente ajusta fino."
+    always {
+      echo "Pipeline finalizada."
     }
   }
 }
