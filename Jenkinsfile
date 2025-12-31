@@ -45,16 +45,8 @@ pipeline {
 
     stage('Docker Push') {
       steps {
-        withCredentials([usernamePassword(
-          credentialsId: 'dockerhub-credentials',
-          usernameVariable: 'DU',
-          passwordVariable: 'DP'
         )]) {
           sh '''#!/bin/bash
-            set -e
-            TAG=${BUILD_NUMBER}
-
-            echo "$DP" | docker login -u "$DU" --password-stdin
 
             docker push ${API_IMAGE_REPO}:${TAG}
             docker push ${API_IMAGE_REPO}:latest
@@ -62,7 +54,7 @@ pipeline {
             docker push ${WEB_IMAGE_REPO}:${TAG}
             docker push ${WEB_IMAGE_REPO}:latest
 
-            docker logout
+            
           '''
         }
       }
