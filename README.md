@@ -21,10 +21,14 @@ apps/
 ```
 
 ## Configuração de ambiente
-Crie um arquivo `.env` em `apps/api` com a conexão do banco:
+Crie um arquivo `.env` em `apps/api` com a conexão do banco e segredos:
 
 ```
 DATABASE_URL="postgresql://usuario:senha@localhost:5432/projeto_saas"
+JWT_SECRET="troque-este-segredo"
+ADMIN_EMAIL="admin@projeto.com"
+ADMIN_PASSWORD="senha-forte"
+WEB_ORIGIN="http://localhost:3000"
 ```
 
 ## Instalação
@@ -41,12 +45,21 @@ A partir de `apps/api`:
 
 ```
 cd apps/api
-npx prisma generate
-npx prisma migrate dev --name init
+npm run prisma:generate
+npm run prisma:migrate:deploy
 ```
 
-## Seeds iniciais (sugestão)
-O `schema.prisma` contém sugestões para seed: criar planos **Starter/Pro/Prime**, indicadores clássicos (SMA, EMA, RSI, MACD), indicadores proprietários básicos, relacionar planos ↔ indicadores e criar usuários **ADMIN/SUPPORT** iniciais.
+## Seed automático (bootstrap)
+No start da API o seed roda automaticamente:
+- Cria planos **Starter/Pro/Prime** se não existirem.
+- Cria indicadores **MA/RSI/MACD** se não existirem.
+- Cria vínculos Plan ↔ Indicators.
+- Cria um usuário **ADMIN** com `ADMIN_EMAIL`/`ADMIN_PASSWORD` caso não exista.
+
+Opcional (admin):
+```
+POST /api/admin/seed/reseed
+```
 
 ## Subindo o backend (NestJS)
 Na raiz:
@@ -67,19 +80,47 @@ npm run dev:web
 O frontend ficará disponível em `http://localhost:3000`.
 
 ## Endpoints principais (API)
-- `POST /api/plans` – criar plano (requer header `x-actor-user-id`)
-- `GET /api/plans` – listar planos
-- `GET /api/plans/:id` – obter plano
-- `PATCH /api/plans/:id` – atualizar plano (requer header `x-actor-user-id`)
-- `DELETE /api/plans/:id` – remover plano (requer header `x-actor-user-id`)
+Autenticação (cookies httpOnly):
+- `POST /api/auth/register`
+- `POST /api/auth/login`
+- `POST /api/auth/refresh`
+- `POST /api/auth/logout`
+- `GET /api/auth/me`
 
-- `POST /api/setups` – criar setup (requer header `x-user-id`)
-- `GET /api/setups` – listar setups do usuário (requer header `x-user-id`)
-- `GET /api/setups/:id` – obter setup (requer header `x-user-id`)
-- `PATCH /api/setups/:id` – atualizar setup (requer header `x-user-id`)
-- `DELETE /api/setups/:id` – remover setup (requer header `x-user-id`)
+Planos/Indicadores:
+- `GET /api/plans`
+- `GET /api/indicators`
+
+Setups (protegido por JWT):
+- `POST /api/setups`
+- `GET /api/setups`
+- `GET /api/setups/:id`
+- `PATCH /api/setups/:id`
+- `DELETE /api/setups/:id`
+
+Assinaturas:
+- `GET /api/subscriptions/active`
+- `POST /api/subscriptions/select`
+
+Admin (role ADMIN):
+- `POST /api/plans`
+- `PATCH /api/plans/:id`
+- `DELETE /api/plans/:id`
+- `POST /api/plans/:id/indicators`
+- `POST /api/indicators`
+- `PATCH /api/indicators/:id`
+- `DELETE /api/indicators/:id`
+- `GET /api/users`
+- `PATCH /api/users/:id/status`
+- `PATCH /api/users/:id/plan`
+- `GET /api/admin/audit`
 
 ## Observações de escopo
 - A plataforma **não executa trades**.
 - Não integra com corretoras nem solicita credenciais.
 - O objetivo é **análise técnica** com indicadores e setups persistidos.
+
+## Fluxo do produto (MVP)
+- Sem login → redireciona para `/login`.
+- Após login → `/app` (dashboard).
+- Menu Admin aparece apenas para `ADMIN`.
