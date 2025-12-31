@@ -12,3 +12,11 @@ build/
 # Env
 .env
 .env.*
+
+node_modules/
+**/node_modules/
+.next/
+dist/
+build/
+.env
+.env.*
