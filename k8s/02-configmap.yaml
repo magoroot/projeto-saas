@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: saas-app-config
+  namespace: saas-operator
+data:
+  ADMIN_EMAIL: "admin@operator.com"
+  WEB_ORIGIN: "https://operator.rushconnect.com.br"
