@@ -3,7 +3,7 @@ import { SeedService } from './seed.service';
 import { JwtAuthGuard } from '../modules/auth/jwt-auth.guard';
 import { RolesGuard } from '../modules/auth/roles.guard';
 import { Roles } from '../modules/auth/roles.decorator';
-import { UserRole } from '@prisma/client';
+import { UserRole } from '../modules/auth/auth.types';
 
 @Controller('admin/seed')
 export class SeedController {

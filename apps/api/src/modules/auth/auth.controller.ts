@@ -7,7 +7,8 @@ import {
   Res,
   UseGuards,
 } from '@nestjs/common';
-import { Request, Response } from 'express';
+type Response = any;
+type Request = any;
 import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
@@ -125,17 +126,14 @@ export class AuthController {
     if (!cookieHeader) {
       return undefined;
     }
-    const cookies = cookieHeader.split(';').reduce<Record<string, string>>(
-      (acc, part) => {
-        const [key, ...rest] = part.trim().split('=');
-        if (!key) {
-          return acc;
-        }
-        acc[key] = decodeURIComponent(rest.join('='));
+    const cookies = cookieHeader.split(';').reduce((acc: any, part: any) => {
+      const [key, ...rest] = part.trim().split('=');
+      if (!key) {
         return acc;
-      },
-      {},
-    );
+      }
+      acc[key] = decodeURIComponent(rest.join('='));
+      return acc;
+    }, {});
     return cookies[name];
   }
 }

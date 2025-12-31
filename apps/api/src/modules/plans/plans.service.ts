@@ -1,5 +1,4 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreatePlanDto } from './dto/create-plan.dto';
 import { UpdatePlanDto } from './dto/update-plan.dto';
@@ -125,7 +124,7 @@ export class PlansService {
     actorUserId: string,
     action: string,
     targetId: string,
-    metadata: Prisma.InputJsonValue,
+    metadata: any,
   ) {
     await this.prisma.adminAuditLog.create({
       data: {

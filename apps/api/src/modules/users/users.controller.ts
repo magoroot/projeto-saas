@@ -12,8 +12,7 @@ import { UsersService } from './users.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
-import { AuthenticatedRequest } from '../auth/auth.types';
-import { UserRole } from '@prisma/client';
+import { AuthenticatedRequest, UserRole } from '../auth/auth.types';
 
 @Controller('users')
 export class UsersController {

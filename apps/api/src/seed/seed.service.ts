@@ -1,5 +1,4 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { Market, Prisma, UserRole, UserStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import * as bcrypt from 'bcryptjs';
 
@@ -21,7 +20,7 @@ export class SeedService {
 
     this.logger.log('Seeding plans and indicators...');
 
-    const indicatorSeeds: Prisma.IndicatorCreateInput[] = [
+    const indicatorSeeds: any[] = [
       {
         code: 'MA',
         name: 'Moving Average',
@@ -65,32 +64,32 @@ export class SeedService {
       }
     }
 
-    const planSeeds: Prisma.PlanCreateInput[] = [
+    const planSeeds: any[] = [
       {
         name: 'Starter',
         description: 'Plano essencial para análises básicas.',
-        price: new Prisma.Decimal(49),
+        price: 49,
         currency: 'BRL',
         maxIndicatorsActive: 2,
-        allowedMarkets: [Market.FOREX, Market.CRYPTO],
+        allowedMarkets: ['FOREX', 'CRYPTO'],
         isActive: true,
       },
       {
         name: 'Pro',
         description: 'Indicadores avançados para traders ativos.',
-        price: new Prisma.Decimal(129),
+        price: 129,
         currency: 'BRL',
         maxIndicatorsActive: 4,
-        allowedMarkets: [Market.FOREX, Market.CRYPTO, Market.INDICES],
+        allowedMarkets: ['FOREX', 'CRYPTO', 'INDICES'],
         isActive: true,
       },
       {
         name: 'Prime',
         description: 'Acesso total e indicadores proprietários.',
-        price: new Prisma.Decimal(249),
+        price: 249,
         currency: 'BRL',
         maxIndicatorsActive: 6,
-        allowedMarkets: [Market.FOREX, Market.CRYPTO, Market.INDICES],
+        allowedMarkets: ['FOREX', 'CRYPTO', 'INDICES'],
         isActive: true,
       },
     ];
@@ -112,7 +111,7 @@ export class SeedService {
       const plans = await this.prisma.plan.findMany();
       const indicators = await this.prisma.indicator.findMany();
       const indicatorMap = new Map(
-        indicators.map((item) => [item.code, item.id]),
+        indicators.map((item: any) => [item.code, item.id]),
       );
 
       const planIndicatorMap: Record<string, string[]> = {
@@ -171,8 +170,8 @@ export class SeedService {
         name: 'Admin',
         email: adminEmail,
         passwordHash,
-        role: UserRole.ADMIN,
-        status: UserStatus.ACTIVE,
+        role: 'ADMIN',
+        status: 'ACTIVE',
       },
     });
 

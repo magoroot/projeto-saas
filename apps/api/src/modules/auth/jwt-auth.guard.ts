@@ -43,17 +43,14 @@ export class JwtAuthGuard implements CanActivate {
       return null;
     }
 
-    const cookies = cookieHeader.split(';').reduce<Record<string, string>>(
-      (acc, part) => {
-        const [key, ...rest] = part.trim().split('=');
-        if (!key) {
-          return acc;
-        }
-        acc[key] = decodeURIComponent(rest.join('='));
+    const cookies = cookieHeader.split(';').reduce((acc: any, part: any) => {
+      const [key, ...rest] = part.trim().split('=');
+      if (!key) {
         return acc;
-      },
-      {},
-    );
+      }
+      acc[key] = decodeURIComponent(rest.join('='));
+      return acc;
+    }, {});
 
     return cookies.saas_access_token ?? null;
   }

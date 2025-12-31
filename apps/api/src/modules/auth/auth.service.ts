@@ -9,8 +9,8 @@ import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 import { RefreshDto } from './dto/refresh.dto';
 import { LogoutDto } from './dto/logout.dto';
-import { UserRole, UserStatus } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
+import { UserRole } from './auth.types';
 import { createHash, randomBytes } from 'crypto';
 
 const ACCESS_TOKEN_TTL = process.env.JWT_EXPIRES_IN ?? '15m';
@@ -40,8 +40,8 @@ export class AuthService {
         name: dto.name,
         email: dto.email.toLowerCase(),
         passwordHash,
-        role: UserRole.USER,
-        status: UserStatus.ACTIVE,
+        role: 'USER',
+        status: 'ACTIVE',
       },
     });
 
@@ -82,7 +82,7 @@ export class AuthService {
     if (!user) {
       throw new UnauthorizedException('Invalid credentials');
     }
-    if (user.status !== UserStatus.ACTIVE) {
+    if (user.status !== 'ACTIVE') {
       throw new UnauthorizedException('User is suspended');
     }
 
@@ -199,9 +199,7 @@ export class AuthService {
             status: subscription.status,
             startedAt: subscription.startedAt,
             plan: subscription.plan,
-            indicators: subscription.plan.planIndicators.map((item) =>
-              item.indicator,
-            ),
+            indicators: subscription.plan.planIndicators.map((item: any) => item.indicator),
           }
         : null,
     };

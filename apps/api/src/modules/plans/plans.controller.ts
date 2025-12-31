@@ -16,8 +16,7 @@ import { UpdatePlanDto } from './dto/update-plan.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
-import { AuthenticatedRequest } from '../auth/auth.types';
-import { UserRole } from '@prisma/client';
+import { AuthenticatedRequest, UserRole } from '../auth/auth.types';
 
 @Controller('plans')
 export class PlansController {

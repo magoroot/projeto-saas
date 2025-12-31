@@ -11,7 +11,11 @@ import {
   IsString,
   Length,
 } from 'class-validator';
-import { Market } from '@prisma/client';
+enum Market {
+  FOREX = 'FOREX',
+  INDICES = 'INDICES',
+  CRYPTO = 'CRYPTO',
+}
 
 export class CreatePlanDto {
   @IsString()
