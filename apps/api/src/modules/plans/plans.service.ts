@@ -1,5 +1,4 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreatePlanDto } from './dto/create-plan.dto';
 import { UpdatePlanDto } from './dto/update-plan.dto';
@@ -23,10 +22,17 @@ export class PlansService {
     return plan;
   }
 
-  async findAll(isActive?: boolean) {
+  async findAll(isActive?: boolean, includeIndicators = false) {
     return this.prisma.plan.findMany({
       where: isActive === undefined ? undefined : { isActive },
       orderBy: { createdAt: 'desc' },
+      include: includeIndicators
+        ? {
+            planIndicators: {
+              include: { indicator: true },
+            },
+          }
+        : undefined,
     });
   }
 
@@ -74,6 +80,39 @@ export class PlansService {
     return { deleted: true };
   }
 
+  async updateIndicators(
+    actorUserId: string | undefined,
+    planId: string,
+    indicatorIds: string[],
+  ) {
+    const ensuredActorId = this.ensureActor(actorUserId);
+    const plan = await this.prisma.plan.findUnique({ where: { id: planId } });
+    if (!plan) {
+      throw new NotFoundException('Plan not found');
+    }
+
+    await this.prisma.planIndicator.deleteMany({ where: { planId } });
+    if (indicatorIds.length > 0) {
+      await this.prisma.planIndicator.createMany({
+        data: indicatorIds.map((indicatorId) => ({ planId, indicatorId })),
+        skipDuplicates: true,
+      });
+    }
+
+    await this.logAudit(ensuredActorId, 'plan.indicators.update', planId, {
+      indicatorIds,
+    });
+
+    return this.prisma.plan.findUnique({
+      where: { id: planId },
+      include: {
+        planIndicators: {
+          include: { indicator: true },
+        },
+      },
+    });
+  }
+
   private ensureActor(actorUserId: string | undefined): string {
     if (!actorUserId) {
       throw new BadRequestException('Missing x-actor-user-id header');
@@ -85,7 +124,7 @@ export class PlansService {
     actorUserId: string,
     action: string,
     targetId: string,
-    metadata: Prisma.InputJsonValue,
+    metadata: any,
   ) {
     await this.prisma.adminAuditLog.create({
       data: {
