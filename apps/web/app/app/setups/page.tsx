@@ -8,7 +8,7 @@ type Setup = {
   name: string;
   symbol: string;
   timeframe: string;
-  indicators: string[];
+  indicators: { code: string; enabled?: boolean; params?: Record<string, unknown> }[];
   isDefault: boolean;
 };
 
@@ -57,7 +57,8 @@ export default function SetupsPage() {
       indicators: formState.indicators
         .split(',')
         .map((item) => item.trim())
-        .filter(Boolean),
+        .filter(Boolean)
+        .map((code) => ({ code, enabled: true, params: {} })),
       isDefault: formState.isDefault,
     };
 
@@ -88,7 +89,7 @@ export default function SetupsPage() {
       name: setup.name,
       symbol: setup.symbol,
       timeframe: setup.timeframe,
-      indicators: setup.indicators.join(', '),
+      indicators: setup.indicators.map((item) => item.code).join(', '),
       isDefault: setup.isDefault,
     });
   };
@@ -222,7 +223,7 @@ export default function SetupsPage() {
               <span>{setup.name}</span>
               <span>{setup.symbol}</span>
               <span>{setup.timeframe}</span>
-              <span>{setup.indicators.join(', ')}</span>
+              <span>{setup.indicators.map((item) => item.code).join(', ')}</span>
               <span className="table-actions">
                 <button
                   className="link-button"

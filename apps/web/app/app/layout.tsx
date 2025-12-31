@@ -59,8 +59,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             Meus Setups
           </Link>
           <Link
-            className={pathname === '/app/workspace' ? 'active' : ''}
-            href="/app/workspace"
+            className={pathname === '/app/mesa' ? 'active' : ''}
+            href="/app/mesa"
           >
             Mesa
           </Link>

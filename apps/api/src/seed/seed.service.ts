@@ -52,26 +52,6 @@ export class SeedService {
         userParamsEditable: true,
         isActive: true,
       },
-      {
-        code: 'ATLAS',
-        name: 'Atlas Bands',
-        description: 'Indicador proprietário de volatilidade.',
-        category: 'Proprietary',
-        isPremium: true,
-        defaultParams: { length: 34, multiplier: 2.1 },
-        userParamsEditable: false,
-        isActive: true,
-      },
-      {
-        code: 'PULSE',
-        name: 'Pulse Flow',
-        description: 'Leitura proprietária de fluxo de ordens.',
-        category: 'Proprietary',
-        isPremium: true,
-        defaultParams: { sensitivity: 0.7 },
-        userParamsEditable: false,
-        isActive: true,
-      },
     ];
 
     if (indicatorCount === 0) {
@@ -138,7 +118,7 @@ export class SeedService {
       const planIndicatorMap: Record<string, string[]> = {
         Starter: ['MA', 'RSI'],
         Pro: ['MA', 'RSI', 'MACD'],
-        Prime: ['MA', 'RSI', 'MACD', 'ATLAS', 'PULSE'],
+        Prime: ['MA', 'RSI', 'MACD'],
       };
 
       for (const plan of plans) {

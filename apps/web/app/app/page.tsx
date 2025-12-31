@@ -40,7 +40,7 @@ type Setup = {
   name: string;
   symbol: string;
   timeframe: string;
-  indicators: string[];
+  indicators: { code: string; enabled?: boolean; params?: Record<string, unknown> }[];
   updatedAt: string;
 };
 

@@ -3,12 +3,26 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { CreateSetupDto } from './dto/create-setup.dto';
 import { UpdateSetupDto } from './dto/update-setup.dto';
 
+type SetupIndicatorInput = {
+  code: string;
+  enabled?: boolean;
+  params?: Record<string, unknown>;
+};
+
 @Injectable()
 export class SetupsService {
   constructor(private readonly prisma: PrismaService) {}
 
   async create(userId: string, data: CreateSetupDto) {
-    await this.validateIndicatorsAllowed(userId, data.indicators);
+    const indicators = this.normalizeIndicators(data.indicators);
+    await this.validateIndicatorsAllowed(userId, indicators);
+
+    if (data.isDefault) {
+      await this.prisma.userSetup.updateMany({
+        where: { userId },
+        data: { isDefault: false },
+      });
+    }
 
     return this.prisma.userSetup.create({
       data: {
@@ -16,7 +30,7 @@ export class SetupsService {
         name: data.name,
         symbol: data.symbol,
         timeframe: data.timeframe,
-        indicators: data.indicators,
+        indicators,
         isDefault: data.isDefault ?? false,
       },
     });
@@ -47,8 +61,19 @@ export class SetupsService {
       throw new NotFoundException('Setup not found');
     }
 
-    if (data.indicators) {
-      await this.validateIndicatorsAllowed(userId, data.indicators);
+    const indicators = data.indicators
+      ? this.normalizeIndicators(data.indicators)
+      : undefined;
+
+    if (indicators) {
+      await this.validateIndicatorsAllowed(userId, indicators);
+    }
+
+    if (data.isDefault) {
+      await this.prisma.userSetup.updateMany({
+        where: { userId },
+        data: { isDefault: false },
+      });
     }
 
     return this.prisma.userSetup.update({
@@ -57,7 +82,7 @@ export class SetupsService {
         name: data.name,
         symbol: data.symbol,
         timeframe: data.timeframe,
-        indicators: data.indicators,
+        indicators,
         isDefault: data.isDefault,
       },
     });
@@ -75,7 +100,10 @@ export class SetupsService {
     return { deleted: true };
   }
 
-  private async validateIndicatorsAllowed(userId: string, indicators: string[]) {
+  private async validateIndicatorsAllowed(
+    userId: string,
+    indicators: SetupIndicatorInput[],
+  ) {
     const subscription = await this.prisma.subscription.findFirst({
       where: {
         userId,
@@ -104,7 +132,12 @@ export class SetupsService {
         (item: { indicator: { code: string } }) => item.indicator.code,
       ),
     );
-    const requested = Array.from(new Set(indicators));
+    const activeIndicators = indicators.filter(
+      (indicator) => indicator.enabled !== false,
+    );
+    const requested = Array.from(
+      new Set(activeIndicators.map((indicator) => indicator.code)),
+    );
 
     if (requested.length > plan.maxIndicatorsActive) {
       throw new BadRequestException(
@@ -119,5 +152,27 @@ export class SetupsService {
         `Indicators not allowed for plan ${plan.name}: ${notAllowed.join(', ')}`,
       );
     }
+  }
+
+  private normalizeIndicators(
+    indicators: Array<SetupIndicatorInput> | string[],
+  ): SetupIndicatorInput[] {
+    if (indicators.length === 0) {
+      return [];
+    }
+
+    if (typeof indicators[0] === 'string') {
+    return (indicators as string[]).map((code) => ({
+      code: code.toUpperCase(),
+      enabled: true,
+      params: {},
+    }));
+  }
+
+  return (indicators as SetupIndicatorInput[]).map((indicator) => ({
+      code: indicator.code.toUpperCase(),
+      enabled: indicator.enabled ?? true,
+      params: indicator.params ?? {},
+    }));
   }
 }
