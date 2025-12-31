@@ -13,29 +13,41 @@ spec:
       labels:
         app: saas-api
     spec:
+      initContainers:
+        - name: prisma-migrate
+          image: REPLACE_API_IMAGE
+          imagePullPolicy: IfNotPresent
+          envFrom:
+            - secretRef:
+                name: saas-app-secrets
+          command: ["sh", "-lc"]
+          args:
+            - |
+              cd /app/apps/api && npx prisma migrate deploy
+
       containers:
         - name: api
           image: REPLACE_API_IMAGE
+          imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 3001
-          env:
-            - name: DATABASE_URL
-              valueFrom:
-                secretKeyRef:
-                  name: saas-secrets
-                  key: DATABASE_URL
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: saas-api
-  namespace: saas-operator
-spec:
-  type: NodePort
-  selector:
-    app: saas-api
-  ports:
-    - name: http
-      port: 3001
-      targetPort: 3001
-      nodePort: 32081
+
+          envFrom:
+            - secretRef:
+                name: saas-app-secrets
+            - configMapRef:
+                name: saas-app-config
+
+          readinessProbe:
+            httpGet:
+              path: /api/plans
+              port: 3001
+            initialDelaySeconds: 10
+            periodSeconds: 10
+
+          livenessProbe:
+            httpGet:
+              path: /api/plans
+              port: 3001
+            initialDelaySeconds: 20
+            periodSeconds: 20
