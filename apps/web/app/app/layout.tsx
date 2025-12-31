@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { apiFetch, clearCookie, getCookie } from '../lib/api';
+import { apiFetch } from '../lib/api';
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -12,33 +12,30 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const [userRole, setUserRole] = useState<string | null>(null);
 
   useEffect(() => {
-    const storedName = getCookie('saas_user_name');
-    const storedRole = getCookie('saas_user_role');
-    if (storedName) {
-      setUserName(storedName);
-    }
-    if (storedRole) {
-      setUserRole(storedRole);
-    }
+    const loadProfile = async () => {
+      try {
+        const response = await apiFetch<{
+          user: { name: string; role: string };
+        }>('/auth/me');
+        setUserName(response.user.name);
+        setUserRole(response.user.role);
+      } catch (error) {
+        setUserName(null);
+        setUserRole(null);
+      }
+    };
+    loadProfile();
   }, []);
 
   const handleLogout = async () => {
-    const refreshToken = getCookie('saas_refresh_token');
-    if (refreshToken) {
-      try {
-        await apiFetch('/auth/logout', {
-          method: 'POST',
-          body: JSON.stringify({ refreshToken }),
-        });
-      } catch (error) {
-        // ignore
-      }
+    try {
+      await apiFetch('/auth/logout', {
+        method: 'POST',
+        body: JSON.stringify({}),
+      });
+    } catch (error) {
+      // ignore
     }
-    clearCookie('saas_access_token');
-    clearCookie('saas_refresh_token');
-    clearCookie('saas_user_role');
-    clearCookie('saas_user_id');
-    clearCookie('saas_user_name');
     router.push('/login');
   };
 

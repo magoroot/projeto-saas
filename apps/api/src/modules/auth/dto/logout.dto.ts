@@ -1,9 +1,9 @@
-import { IsNotEmpty, IsOptional, IsString } from 'class-validator';
+import { IsOptional, IsString } from 'class-validator';
 
 export class LogoutDto {
   @IsString()
-  @IsNotEmpty()
-  refreshToken!: string;
+  @IsOptional()
+  refreshToken?: string;
 
   @IsString()
   @IsOptional()
